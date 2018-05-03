@@ -1,0 +1,125 @@
+---
+title: "Singular Spectrum Analysis"
+author: "Akshay Merchant"
+date: "May 3, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+##Introduction
+
+
+Singular Spectrum Analysis - is a non-parametric spectral estimation method which combines elements of classical time series, multivariate theory, dynamic systems, and signal processing. SSA decomposes a time series into several components, each having a meaningful interpretation. 
+
+SSA Methodology
+
+1. Decomposition - developing a multidimensional matrix using the one-dimensional time series and its lagged time series. Singular Value Decomposition(SVD) is then used to obtain a raked trajectory of the eigenvalues in the time series matrix.  
+
+2. Reconstruction - grouping pairs eigenvalues to explain the information present in the data and diagonal averaging to then convert each eigenvalue into a time series to forecast.  
+
+
+##Imports
+
+
+```{r warning=FALSE}
+library(quantmod)
+library(forecast)
+library(Rssa)
+```
+
+
+##Data
+
+
+```{r warning=FALSE}
+getSymbols("AAPL", src = "yahoo", from = as.Date("2017-01-01"), to = as.Date("2018-01-01"), warnings = FALSE)
+data <- AAPL$AAPL.Close
+```
+
+
+##Decomposition
+
+
+```{r}
+decompose <- ssa(data)
+```
+
+
+```{r}
+plot(decompose) #eigenvalues
+plot(decompose, type = "paired", groups = as.list(1:20)) #pairs of eigenvectors
+plot(decompose, type = "wcor", groups = as.list(1:20)) #wcor
+```
+
+
+##Overfit Reconstruction
+
+
+```{r}
+#overfit reconstruction
+recon_all <- reconstruct(decompose, groups = list(1:11))
+
+#plot overfit reconsruction on time series
+plot (data, lwd=3, col="gray")
+lines(recon_all$F1, col="red", lwd= 2) 
+```
+
+
+##Reconstruction
+
+
+```{r}
+recon <- reconstruct(decompose, groups = list(1, c(2,3), 4, 5, c(6,7), c(8,9), c(10,11)))
+#following eigenvalues explain most of the variability in the data
+```
+
+```{r}
+#plot 1st eigenvalue on time series
+plot (data, lwd=3, col="gray")
+lines(recon$F1, col="red", lwd= 2) #1st eigen explains the trend in the time series
+```
+
+
+#Residuals
+
+
+```{r}
+#residuals
+res <- residuals(recon)
+
+#residuals normally distributed
+plot(density(res))
+#but periodogram shows seasonality due to repeating patterns at 0.1 & 0.2
+spec.pgram(res,detrend = FALSE,log = "no") 
+```
+
+
+##SSA on residuals to remove seasonality
+
+
+```{r}
+#reconstruction 2 to remove seasonality
+recon_2 <- ssa(res)
+plot(recon_2) #eigenvalues
+plot(recon_2, type = "paired", idx = 1:20, plot.contrib = FALSE) #eigenvectors pair
+
+#Recreating the seasonality using forst 10 eigenvectors
+res_2 <- reconstruct(recon_2, groups=list(1:10))
+res_final <- residuals(res_2);
+```
+
+##White Noise
+
+```{r}
+#plot residuals
+plot(res_final)
+
+#checking residuals to make sure it is white noise
+plot(density(res_final))
+```
+
+
